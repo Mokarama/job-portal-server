@@ -32,11 +32,17 @@ async function run() {
    const jobApplicationCollection =client.db('job_portal').collection('job_applications');
 
    app.get('/jobs', async(req, res)=>{
-        const cursor= jobsCollection.find();
+        const email = req.query.email;
+        let query ={};
+        if(email){
+          query = { hr_email: email}
+        }
+        const cursor= jobsCollection.find(query);
         const result = await cursor.toArray();
-        res.send(result)
+        res.send(result);
    })
 
+   
   //Job detailes er data load
   app.get('/jobs/:id', async(req, res)=>{
     const id =req.params.id;
@@ -46,6 +52,12 @@ async function run() {
 
   })
 
+  app.post('/jobs', async(req, res)=>{
+    const newJob=req.body;
+    const result = await jobsCollection.insertOne(newJob);
+    res.send(result);
+
+  })
 
   //job application apis
   //get all data, get one data, get some data [0, 1, many]
@@ -63,14 +75,51 @@ async function run() {
     const application =req.body;
    const result =await jobApplicationCollection.insertOne(application);
 
+
+   //Not the best way (use aggregate)
+   // skip --> it
+
+    const id =application.job_id;
+    const query ={ _id: new ObjectId(id)}
+    const job = await jobsCollection.findOne(query);
+    console.log(job);
+
+    let count = 0;
+    if(job.applicationCount){
+      count = job.applicationCount + 1
+
+    }
+
+    else{
+      newCount = 1
+    }
+
+    // now update the job info
+    const filter ={ _id: new ObjectId(id)};
+
+    const updateDoc ={
+      $set:{
+        applicationCount: newCount
+      }
+
+    }
+
+    const updateResult = await jobsCollection.updateOne(filter, updateDoc);
+
+   
    //fokira way to aggregate data
 for(const application of result){
+   console.log(application,"application id")
+
+
   console.log(application.job_id);
   const query1 ={ _id: new ObjectId(application.job_id)}
   const job = await jobsCollection.findOne(query1);
   if(job){
-      application.title = job.title;
-      application.company =job.company;
+      application.title = job.title,
+      application.location =job.location,
+      application.company =job.company,
+      application.company_logo = job.company_logo
   }
 }
 
